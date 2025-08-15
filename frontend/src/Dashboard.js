@@ -218,6 +218,7 @@ const Dashboard = ({ user, onLogout }) => {
   // Load users on component mount
   useEffect(() => {
     loadUsers();
+    document.title = 'Settings - User Management - Kelly\'s User Management';
   }, []);
 
   // Handle keyboard shortcuts
@@ -342,7 +343,7 @@ const Dashboard = ({ user, onLogout }) => {
         <Toolbar>
           <AccountCircleIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            User Management
+            ⚙️ Settings - User Management
           </Typography>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -432,7 +433,7 @@ const Dashboard = ({ user, onLogout }) => {
               component="button"
               variant="body2"
               color="inherit"
-              onClick={handleLogoutClick}
+              onClick={() => navigate('/todos')}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -441,7 +442,7 @@ const Dashboard = ({ user, onLogout }) => {
               }}
             >
               <HomeIcon sx={{ mr: 0.5, fontSize: 16 }} />
-              Login Page
+              My Todo List
             </Link>
             <Typography color="text.primary" variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
               <PersonIcon sx={{ mr: 0.5, fontSize: 16 }} />
@@ -450,23 +451,7 @@ const Dashboard = ({ user, onLogout }) => {
           </Breadcrumbs>
         </Box>
 
-        {/* Navigation Actions */}
-        <Box sx={{ mb: 3 }}>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={() => navigate('/todos')}
-            sx={{ 
-              backgroundColor: '#5dade2',
-              '&:hover': { backgroundColor: '#3498db' },
-              mr: 2,
-              boxShadow: 3
-            }}
-            startIcon={<AddIcon />}
-          >
-            📝 Go to Todo List
-          </Button>
-        </Box>
+
 
         <Grid container spacing={4}>
           

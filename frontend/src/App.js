@@ -149,7 +149,7 @@ function App() {
             <Route 
               path="/login" 
               element={
-                user ? <Navigate to="/dashboard" replace /> : <Login onLogin={handleLogin} />
+                user ? <Navigate to="/todos" replace /> : <Login onLogin={handleLogin} />
               } 
             />
             <Route 
@@ -170,7 +170,7 @@ function App() {
             />
             <Route 
               path="/" 
-              element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
+              element={<Navigate to={user ? "/todos" : "/login"} replace />} 
             />
           </Routes>
         </Router>

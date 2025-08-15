@@ -42,7 +42,7 @@ import {
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
   Schedule as ScheduleIcon,
   Flag as FlagIcon,
-  ArrowBack as ArrowBackIcon
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -82,6 +82,10 @@ const TodoList = ({ user, onLogout }) => {
   useEffect(() => {
     fetchTodos();
   }, [user]);
+
+  useEffect(() => {
+    document.title = 'My Todo List - Kelly\'s User Management';
+  }, []);
 
   // Handle creating a new todo
   const handleCreateTodo = async () => {
@@ -222,11 +226,12 @@ const TodoList = ({ user, onLogout }) => {
             color="inherit"
             onClick={() => navigate('/dashboard')}
             sx={{ mr: 2 }}
+            title="User Management Settings"
           >
-            <ArrowBackIcon />
+            <SettingsIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            📝 Todo List
+            📝 My Todo List
           </Typography>
           <Button color="inherit" onClick={onLogout}>
             Logout
