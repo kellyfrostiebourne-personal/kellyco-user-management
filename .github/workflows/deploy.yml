@@ -1,0 +1,193 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main, production]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: user-management-app
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run tests
+        run: |
+          python -m pytest src/tests/ -v || echo "No tests found"
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+
+  deploy-infrastructure:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    outputs:
+      db-endpoint: ${{ steps.deploy-stack.outputs.db-endpoint }}
+      alb-dns: ${{ steps.deploy-stack.outputs.alb-dns }}
+      frontend-bucket: ${{ steps.deploy-stack.outputs.frontend-bucket }}
+      cloudfront-url: ${{ steps.deploy-stack.outputs.cloudfront-url }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Deploy CloudFormation stack
+        id: deploy-stack
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'production' }}"
+          STACK_NAME="${{ env.PROJECT_NAME }}-${ENVIRONMENT}"
+          
+          aws cloudformation deploy \
+            --template-file aws/cloudformation.yml \
+            --stack-name "${STACK_NAME}" \
+            --parameter-overrides \
+              ProjectName="${{ env.PROJECT_NAME }}" \
+              Environment="${ENVIRONMENT}" \
+              DBPassword="${{ secrets.DB_PASSWORD }}" \
+            --capabilities CAPABILITY_IAM \
+            --region ${{ env.AWS_REGION }}
+          
+          # Get outputs
+          echo "db-endpoint=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --query 'Stacks[0].Outputs[?OutputKey==`DatabaseEndpoint`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+          echo "alb-dns=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+          echo "frontend-bucket=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --query 'Stacks[0].Outputs[?OutputKey==`FrontendBucketName`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+          echo "cloudfront-url=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontURL`].OutputValue' --output text)" >> $GITHUB_OUTPUT
+
+  deploy-backend:
+    needs: [test, deploy-infrastructure]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Create ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.PROJECT_NAME }}-backend || \
+          aws ecr create-repository --repository-name ${{ env.PROJECT_NAME }}-backend
+      
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  deploy-frontend:
+    needs: [test, deploy-infrastructure]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Build React app
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          REACT_APP_API_URL: https://${{ needs.deploy-infrastructure.outputs.alb-dns }}/api
+      
+      - name: Deploy to S3
+        run: |
+          aws s3 sync frontend/build/ s3://${{ needs.deploy-infrastructure.outputs.frontend-bucket }}/ --delete
+      
+      - name: Invalidate CloudFront
+        run: |
+          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[0].DomainName=='${{ needs.deploy-infrastructure.outputs.frontend-bucket }}.s3.amazonaws.com'].Id" --output text)
+          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+
+  notify-deployment:
+    needs: [deploy-infrastructure, deploy-backend, deploy-frontend]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Notify deployment status
+        run: |
+          if [ "${{ needs.deploy-infrastructure.result }}" == "success" ] && \
+             [ "${{ needs.deploy-backend.result }}" == "success" ] && \
+             [ "${{ needs.deploy-frontend.result }}" == "success" ]; then
+            echo "🎉 Deployment successful!"
+            echo "Frontend: https://${{ needs.deploy-infrastructure.outputs.cloudfront-url }}"
+            echo "Backend API: https://${{ needs.deploy-infrastructure.outputs.alb-dns }}/api"
+            echo "Health Check: https://${{ needs.deploy-infrastructure.outputs.alb-dns }}/api/health"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi

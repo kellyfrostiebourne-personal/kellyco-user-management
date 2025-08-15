@@ -1,0 +1,30 @@
+{
+  "name": "kelly-user-management-serverless",
+  "version": "2.0.0",
+  "description": "Serverless AWS Lambda + DynamoDB architecture for Kelly's User Management System",
+  "main": "lambda_handler.py",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "deploy:dev": "serverless deploy --stage dev",
+    "deploy:prod": "serverless deploy --stage production",
+    "offline": "serverless offline",
+    "logs": "serverless logs -f api",
+    "remove": "serverless remove",
+    "info": "serverless info"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-python-requirements": "^6.0.0",
+    "serverless-offline": "^13.0.0"
+  },
+  "keywords": [
+    "serverless",
+    "aws",
+    "lambda",
+    "dynamodb",
+    "flask",
+    "react"
+  ],
+  "author": "Kelly Francis",
+  "license": "MIT"
+}

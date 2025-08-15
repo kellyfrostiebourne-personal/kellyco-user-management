@@ -1,0 +1,38 @@
+# Dockerfile for serverless local development
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js for Serverless Framework
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Copy requirements and install Python dependencies
+COPY requirements-lambda.txt .
+RUN pip install --no-cache-dir -r requirements-lambda.txt
+
+# Install additional development dependencies
+RUN pip install python-dotenv
+
+# Install Serverless Framework
+RUN npm install -g serverless
+RUN npm install -g serverless-offline
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
+USER app
+
+# Expose port
+EXPOSE 8080
+
+# Start command for local development
+CMD ["python", "web_app_serverless.py"]
