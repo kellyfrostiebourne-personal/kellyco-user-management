@@ -11,6 +11,7 @@ from flask_cors import CORS
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from src.models.dynamodb_user import db_user
+from src.models.dynamodb_todo import db_todo
 
 def create_app():
     """Application factory pattern for serverless deployment."""
@@ -290,6 +291,121 @@ def register_routes(app):
     def logout():
         """Handle user logout."""
         return jsonify({'message': 'Logout successful'}), 200
+    
+    # Todo Management Routes
+    @app.route('/api/todos', methods=['GET'])
+    def get_todos():
+        """Get all todos for the authenticated user."""
+        try:
+            # In a real app, you'd get user_id from JWT token
+            # For demo, we'll use query parameter or default to Kelly's user ID
+            user_id = request.args.get('user_id', '2365999676')  # Kelly's user ID
+            
+            todos = db_todo.get_user_todos(user_id)
+            return jsonify(todos)
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Failed to fetch todos',
+                'details': str(e)
+            }), 500
+    
+    @app.route('/api/todos', methods=['POST'])
+    def create_todo():
+        """Create a new todo for the authenticated user."""
+        try:
+            data = request.get_json()
+            
+            # Validate required fields
+            if not data or not data.get('title'):
+                return jsonify({'error': 'Title is required'}), 400
+            
+            # In a real app, you'd get user_id from JWT token
+            user_id = data.get('user_id', '2365999676')  # Default to Kelly's user ID
+            
+            new_todo = db_todo.create_todo(
+                user_id=user_id,
+                title=data['title'],
+                description=data.get('description', ''),
+                priority=data.get('priority', 'medium'),
+                due_date=data.get('due_date')
+            )
+            
+            return jsonify(new_todo), 201
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Failed to create todo',
+                'details': str(e)
+            }), 500
+    
+    @app.route('/api/todos/<todo_id>', methods=['GET'])
+    def get_todo(todo_id):
+        """Get a specific todo by ID."""
+        try:
+            todo = db_todo.get_todo_by_id(todo_id)
+            if not todo:
+                return jsonify({'error': 'Todo not found'}), 404
+            return jsonify(todo)
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Failed to fetch todo',
+                'details': str(e)
+            }), 500
+    
+    @app.route('/api/todos/<todo_id>', methods=['PUT'])
+    def update_todo(todo_id):
+        """Update a specific todo."""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            # Remove fields that shouldn't be updated directly
+            update_data = {k: v for k, v in data.items() 
+                          if k in ['title', 'description', 'completed', 'priority', 'due_date']}
+            
+            updated_todo = db_todo.update_todo(todo_id, **update_data)
+            return jsonify(updated_todo)
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Failed to update todo',
+                'details': str(e)
+            }), 500
+    
+    @app.route('/api/todos/<todo_id>', methods=['DELETE'])
+    def delete_todo(todo_id):
+        """Delete a specific todo."""
+        try:
+            success = db_todo.delete_todo(todo_id)
+            if success:
+                return jsonify({'message': 'Todo deleted successfully'}), 200
+            else:
+                return jsonify({'error': 'Failed to delete todo'}), 500
+                
+        except Exception as e:
+            return jsonify({
+                'error': 'Failed to delete todo',
+                'details': str(e)
+            }), 500
+    
+    @app.route('/api/todos/<todo_id>/complete', methods=['PUT'])
+    def toggle_todo_completion(todo_id):
+        """Toggle completion status of a todo."""
+        try:
+            data = request.get_json()
+            completed = data.get('completed', True) if data else True
+            
+            updated_todo = db_todo.mark_completed(todo_id, completed)
+            return jsonify(updated_todo)
+            
+        except Exception as e:
+            return jsonify({
+                'error': 'Failed to update todo completion',
+                'details': str(e)
+            }), 500
 
 # Create the application instance
 app = create_app()
@@ -304,5 +420,8 @@ if __name__ == '__main__':
     print("Health check: /api/health")
     print("Press Ctrl+C to stop the server")
     
-    # Run the Flask app
-    app.run(debug=True, host=host, port=port)
+    # Check if running in production/background mode
+    debug_mode = os.environ.get('FLASK_DEBUG', '').lower() in ('true', '1', 'yes')
+    
+    # Run the Flask app (disable debug/reloader for stable background operation)
+    app.run(debug=debug_mode, host=host, port=port, use_reloader=debug_mode)
