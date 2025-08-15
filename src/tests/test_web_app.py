@@ -7,7 +7,7 @@ import json
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from simple_web_app import create_app
+from web_app import create_app
 
 
 @pytest.fixture
@@ -34,8 +34,8 @@ class TestWebApp:
         
         data = json.loads(response.data)
         assert data['status'] == 'healthy'
-        assert data['message'] == 'Simple API is running'
-        assert data['version'] == '1.0.0'
+        assert data['message'] == 'Serverless API is running with OAuth'
+        assert data['version'] == '2.1.0'
 
     def test_get_users(self, client):
         """Test getting all users."""
@@ -44,7 +44,7 @@ class TestWebApp:
         
         data = json.loads(response.data)
         assert isinstance(data, list)
-        assert len(data) >= 2  # Should have at least 2 pre-loaded users
+        assert len(data) >= 1  # Should have at least 1 user (Kelly)
         
         # Check user structure
         user = data[0]
@@ -58,8 +58,8 @@ class TestWebApp:
     def test_create_user_success(self, client):
         """Test creating a new user successfully."""
         new_user = {
-            'username': 'testuser',
-            'email': 'test@example.com',
+            'username': 'unique_testuser_' + str(hash('test'))[1:6],  # Make username unique
+            'email': 'test_unique_' + str(hash('test'))[1:6] + '@example.com',
             'first_name': 'Test',
             'last_name': 'User'
         }
@@ -71,8 +71,8 @@ class TestWebApp:
         assert response.status_code == 201
         
         data = json.loads(response.data)
-        assert data['username'] == 'testuser'
-        assert data['email'] == 'test@example.com'
+        assert data['username'] == new_user['username']
+        assert data['email'] == 'test_unique@example.com'
         assert data['first_name'] == 'Test'
         assert data['last_name'] == 'User'
         assert data['is_active'] is True
@@ -136,7 +136,7 @@ class TestWebApp:
     def test_login_with_email(self, client):
         """Test login using email instead of username."""
         login_data = {
-            'username': 'kelly@kellyco.com',  # Using email
+            'username': 'kelly@example.com',  # Using the actual email from our test user
             'password': 'Kelly'
         }
         

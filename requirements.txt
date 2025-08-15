@@ -10,6 +10,7 @@ serverless-wsgi==3.1.0
 # For testing
 pytest==7.4.3
 pytest-cov==4.1.0
+moto==4.2.14
 
 # For development and code quality
 black==23.11.0

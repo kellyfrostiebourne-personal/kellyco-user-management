@@ -79,7 +79,10 @@ class TestDynamoDBUser:
             'last_name': 'User',
             'created_at': '2023-01-01T00:00:00',
             'updated_at': '2023-01-02T00:00:00',
-            'is_active': True
+            'is_active': True,
+            'oauth_provider': '',
+            'oauth_id': '',
+            'profile_picture': ''
         }
         
         assert result == expected
@@ -114,7 +117,10 @@ class TestDynamoDBUser:
             'last_name': '',
             'created_at': '',
             'updated_at': None,
-            'is_active': True
+            'is_active': True,
+            'oauth_provider': '',
+            'oauth_id': '',
+            'profile_picture': ''
         }
         
         assert result == expected
