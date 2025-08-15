@@ -10,6 +10,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import TodoList from './TodoList';
+import Calendar from './Calendar';
 
 
 
@@ -165,6 +166,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TodoList user={user} onLogout={handleLogout} />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/calendar" 
+              element={
+                <ProtectedRoute>
+                  <Calendar user={user} onLogout={handleLogout} />
                 </ProtectedRoute>
               } 
             />

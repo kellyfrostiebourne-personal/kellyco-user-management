@@ -42,7 +42,8 @@ import {
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
   Schedule as ScheduleIcon,
   Flag as FlagIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -233,6 +234,14 @@ const TodoList = ({ user, onLogout }) => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             📝 My Todo List
           </Typography>
+          <IconButton
+            color="inherit"
+            onClick={() => navigate('/calendar')}
+            sx={{ mr: 1 }}
+            title="Calendar View"
+          >
+            <CalendarIcon />
+          </IconButton>
           <Button color="inherit" onClick={onLogout}>
             Logout
           </Button>
